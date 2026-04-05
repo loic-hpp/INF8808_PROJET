@@ -8,15 +8,15 @@
 import dash
 from dash import dcc, html
 
-import viz1a
-import viz1b
-import viz2
-import viz3
-import viz4
-import viz5
-import viz6
-import viz7
-import viz8
+import graphiques.viz1a as viz1a
+import graphiques.viz1b as viz1b
+import graphiques.viz2 as viz2
+import graphiques.viz3 as viz3
+import graphiques.viz4 as viz4
+import graphiques.viz5 as viz5
+import graphiques.viz6 as viz6
+import graphiques.viz7 as viz7
+import graphiques.viz8 as viz8
 
 app = dash.Dash(__name__)
 app.title = "Hydro-Québec — Gestion de la demande électrique | INF8808"

@@ -13,7 +13,7 @@ HQ_LIGHT = "#009FE3"
 
 
 def get_figure():
-    df = pd.read_csv("consommation-clients-evenements-pointe.csv")
+    df = pd.read_csv("assets/data/consommation-clients-evenements-pointe.csv")
     df["date"] = pd.to_datetime(df["date"])
     df["month"] = df["date"].dt.month
     df["is_winter"] = df["month"].isin([12, 1, 2, 3])

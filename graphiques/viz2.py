@@ -11,7 +11,7 @@ HQ_BLUE = "#00557F"
 
 
 def get_figure():
-    df = pd.read_csv("consommation-clients-evenements-pointe.csv")
+    df = pd.read_csv("assets/data/consommation-clients-evenements-pointe.csv")
     df["date"] = pd.to_datetime(df["date"])
     df["month"] = df["date"].dt.month
     df["dow"] = df["date"].dt.dayofweek
