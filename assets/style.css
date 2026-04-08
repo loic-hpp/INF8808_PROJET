@@ -163,32 +163,6 @@ body {
     text-align: justify;
 }
 
-/* ── Questions Box ── */
-.questions-box {
-    background: var(--hq-light);
-    border-left: 4px solid var(--hq-blue);
-    border-radius: 0 8px 8px 0;
-    padding: 20px 25px;
-    margin-bottom: 25px;
-}
-
-.questions-box h4 {
-    color: var(--hq-dark);
-    margin-bottom: 10px;
-    font-size: 1em;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.questions-box ul {
-    padding-left: 20px;
-}
-
-.questions-box li {
-    margin-bottom: 6px;
-    color: var(--hq-text);
-    font-size: 0.95em;
-}
 
 /* ── Blockquote ── */
 blockquote {
