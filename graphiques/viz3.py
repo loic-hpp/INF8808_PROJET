@@ -1,20 +1,14 @@
 # -*- coding: utf-8 -*-
 """
-Viz 3 — Roses polaires par saison (palette orange, conforme mockup).
-Bars coloured by intensity (highlights peaks) + peak-hour ring overlay.
+Viz 3 — Roses polaires par saison. Palette 100% bleue : heures de pointe
+en navy foncé, heures hors-pointe en bleu ciel clair.
 """
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from data_utils import load_data, base_layout, SEASONS_ORD, PALETTE
 
 
-def _hourly_by_season():
-    df = load_data()
-    return (df.groupby(["saison", "heure_locale"])["energie_totale_consommee"]
-              .mean().reset_index())
-
-
-def get_figure(poste: str | None = None):
+def get_figure(poste=None):
     df = load_data()
     if poste and poste != "Tous":
         df = df[df["poste"] == poste]
@@ -30,8 +24,6 @@ def get_figure(poste: str | None = None):
         horizontal_spacing=0.05, vertical_spacing=0.14,
     )
     positions = [(1, 1), (1, 2), (2, 1), (2, 2)]
-
-    # Peak hours: morning 7-9, evening 17-19 → always highlight
     PEAK_HOURS = {7, 8, 9, 17, 18, 19}
 
     for (row, col), saison in zip(positions, SEASONS_ORD):
@@ -43,10 +35,10 @@ def get_figure(poste: str | None = None):
         hours = data["heure_locale"].tolist()
         avg = data["energie_totale_consommee"].mean()
 
-        # Dual colour: peaks in strong orange, rest in light orange
-        colors = [PALETTE["hot"] if h in PEAK_HOURS else "#F59E0B"
+        # Peak hours → deep HQ primary blue; off-peak → light sky blue
+        colors = [PALETTE["primary"] if h in PEAK_HOURS else PALETTE["blue_300"]
                   for h in hours]
-        opacities = [0.95 if h in PEAK_HOURS else 0.65 for h in hours]
+        opacities = [0.95 if h in PEAK_HOURS else 0.75 for h in hours]
 
         fig.add_trace(go.Barpolar(
             r=values, theta=angles,
@@ -58,7 +50,6 @@ def get_figure(poste: str | None = None):
             customdata=hours, showlegend=False,
         ), row=row, col=col)
 
-        # Centre label: season average
         pos_paper = {"Hiver": (0.22, 0.77), "Printemps": (0.78, 0.77),
                      "Été": (0.22, 0.23), "Automne": (0.78, 0.23)}
         xp, yp = pos_paper[saison]
@@ -71,7 +62,7 @@ def get_figure(poste: str | None = None):
     polar_cfg = dict(
         radialaxis=dict(
             visible=True, range=[0, global_max],
-            tickfont=dict(size=10, color="#6b7280"),
+            tickfont=dict(size=10, color=PALETTE["muted"]),
             gridcolor="rgba(0,85,127,0.18)", nticks=3,
         ),
         angularaxis=dict(
@@ -82,14 +73,14 @@ def get_figure(poste: str | None = None):
             gridcolor="rgba(0,85,127,0.18)",
             tickfont=dict(size=10),
         ),
-        bgcolor="#fff7ed",
+        bgcolor=PALETTE["blue_50"],   # very pale blue background
     )
     for i in range(1, 5):
         key = "polar" if i == 1 else f"polar{i}"
         fig.update_layout(**{key: polar_cfg})
 
     subtitle = ("Tous postes confondus" if not poste or poste == "Tous"
-                else f"Poste {poste}") + " · 2022–2024 · pointes en rouge"
+                else f"Poste {poste}") + " · 2022–2024 · pointes en bleu foncé"
     fig.update_layout(**base_layout(
         "Consommation moyenne par heure selon la saison",
         subtitle, height=780,

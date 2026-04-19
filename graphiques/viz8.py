@@ -1,16 +1,21 @@
 # -*- coding: utf-8 -*-
 """
-Viz 8 — Profils de consommation selon les postes A, B et C (barres groupées).
-Option: vue absolue (kWh/h) ou vue normalisée (par client connecté).
+Viz 8 — Profils par poste A/B/C. Palette 100% bleue : trois nuances
+distinctes (navy profond / bleu HQ / bleu sky) pour distinguer les postes.
 """
 import plotly.graph_objects as go
 from data_utils import load_data, base_layout, SEASONS_ORD, PALETTE
 
 
-POSTE_COLORS = {"A": PALETTE["poste_A"], "B": PALETTE["poste_B"], "C": PALETTE["poste_C"]}
+# Three distinct blue shades so postes are distinguishable without hue change
+POSTE_COLORS = {
+    "A": PALETTE["navy"],      # deep navy
+    "B": PALETTE["accent"],    # HQ cyan
+    "C": PALETTE["blue_400"],  # mid sky-blue
+}
 
 
-def get_figure(mode: str = "absolu"):
+def get_figure(mode="absolu"):
     df = load_data()
 
     if mode == "normalise":
@@ -53,9 +58,10 @@ def get_figure(mode: str = "absolu"):
     fig.update_layout(
         barmode="group", bargap=0.22, bargroupgap=0.06,
         xaxis=dict(title="Saison", showgrid=False, zeroline=False),
-        yaxis=dict(title=ytitle, showgrid=True, gridcolor=PALETTE["grid"], zeroline=False),
+        yaxis=dict(title=ytitle, showgrid=True,
+                   gridcolor=PALETTE["grid"], zeroline=False),
         legend=dict(x=0.98, y=0.98, xanchor="right",
                     bgcolor="rgba(255,255,255,0.95)",
-                    bordercolor="#e5e7eb", borderwidth=1),
+                    bordercolor=PALETTE["blue_100"], borderwidth=1),
     )
     return fig

@@ -320,9 +320,15 @@ viz3_section = html.Section(id="viz3", className="content-section", children=[
 # ─────────────────────────────────────────────────────────────
 # Chapter 5 — Impact GLD + exploration d'événement (Viz 4, 5, 6 cross-linked)
 # ─────────────────────────────────────────────────────────────
-# Build scannable event labels with visual cues (emoji) for réussi/échoué + matin/soir
+# Build scannable event labels with visual cues (emoji) for réussi/échoué + matin/soir.
+# Colour-neutral circle emoji instead of ✅/🟡/❌ to stay on brand (tout bleu).
 def _event_label(row):
-    status = "✅" if row["reduction_pct"] >= 20 else ("🟡" if row["reduction_pct"] >= 0 else "❌")
+    if row["reduction_pct"] >= 20:
+        status = "🔵"      # strong success
+    elif row["reduction_pct"] >= 0:
+        status = "🔹"      # modest success
+    else:
+        status = "⚪"      # counter-productive
     moment = "🌅" if row["periode_jour"] == "matin" else "🌙"
     date_only = row["date_str"].split("-matin")[0].split("-soir")[0]
     return (f"{status} {moment}  {date_only}  ·  "
@@ -375,9 +381,9 @@ viz4_section = html.Section(id="viz4", className="content-section", children=[
             placeholder="Choisir un événement spécifique…",
         ),
         html.Div(className="picker-legend", children=[
-            html.Span("✅ réussi (>20%)"), html.Span("·"),
-            html.Span("🟡 modéré (0–20%)"), html.Span("·"),
-            html.Span("❌ contre-productif (<0%)"), html.Span("·"),
+            html.Span("🔵 réussi (>20%)"), html.Span("·"),
+            html.Span("🔹 modéré (0–20%)"), html.Span("·"),
+            html.Span("⚪ contre-productif (<0%)"), html.Span("·"),
             html.Span("🌅 matin  ·  🌙 soir"),
         ]),
         html.Div(id="event-badge", className="event-badge-wrap"),
@@ -517,7 +523,7 @@ synthese = html.Section(id="synthese", className="content-section synthesis", ch
     html.H2("Synthèse"),
     html.Div(className="synthesis-grid", children=[
         html.Div(className="synthesis-card primary", children=[
-            html.H3("✅ Le programme fonctionne"),
+            html.H3("▲ Le programme fonctionne"),
             html.P([
                 "En moyenne ", html.Strong(f"{KPI['mean_reduction_pct']:.0f}% de réduction"),
                 f" sur {KPI['n_events']} événements, avec des pics à {KPI['best_reduction_pct']:.0f}%. ",

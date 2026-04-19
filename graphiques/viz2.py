@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Viz 2 — Heatmap calendrier jour × mois (palette rouge, conforme mockup).
-Interaction: bouton radio pour afficher en MWh absolus OU % vs moyenne annuelle.
+Viz 2 — Heatmap calendrier jour × mois (palette 100% bleue).
 """
 import numpy as np
 import pandas as pd
@@ -29,10 +28,7 @@ def _aggregate():
     return pivot, wd_avg, we_avg, ferie_row, all_avg
 
 
-def get_figure(mode: str = "absolu"):
-    """
-    mode = "absolu" (MWh) ou "ecart" (% vs moy annuelle)
-    """
+def get_figure(mode="absolu"):
     pivot, wd_avg, we_avg, ferie_row, all_avg = _aggregate()
 
     if mode == "ecart":
@@ -47,10 +43,14 @@ def get_figure(mode: str = "absolu"):
         unit = "%"
         colorbar_title = "Écart vs moy (%)"
         fmt = lambda v: "—" if pd.isna(v) else f"{v:+.0f}%"
-        # Diverging scale for % gap
+        # Diverging scale — BLUE only. Sky-blue for below-average,
+        # light neutral slate at midpoint, deep navy for above-average.
         colorscale = [
-            [0.00, "#2563EB"], [0.35, "#93C5FD"], [0.50, "#F9FAFB"],
-            [0.65, "#FDBA74"], [1.00, "#B91C1C"],
+            [0.00, "#93C5FD"],   # light sky blue (well below avg)
+            [0.30, "#BFDBFE"],
+            [0.50, "#F1F5F9"],   # near-white neutral
+            [0.70, "#2563EB"],
+            [1.00, "#0B3D66"],   # deep navy (well above avg)
         ]
         vabs = max(abs(np.nanmin(z_main)), abs(np.nanmax(z_main)))
         vmin, vmax = -vabs, vabs
@@ -61,20 +61,24 @@ def get_figure(mode: str = "absolu"):
         unit = " MWh"
         colorbar_title = "MWh / jour"
         fmt = lambda v: "—" if pd.isna(v) else f"{v:.1f}"
-        # Red ramp matching mockup ("rouge pâle → rouge foncé")
+        # Sequential monochromatic blue ramp — low conso = pale blue,
+        # high conso = deep HQ navy. Single-hue, very readable.
         colorscale = [
-            [0.00, "#FEF2F2"], [0.20, "#FECACA"], [0.40, "#FCA5A5"],
-            [0.60, "#F87171"], [0.80, "#DC2626"], [1.00, "#7F1D1D"],
+            [0.00, "#EFF6FF"],
+            [0.15, "#DBEAFE"],
+            [0.35, "#BFDBFE"],
+            [0.55, "#60A5FA"],
+            [0.75, "#2563EB"],
+            [0.90, "#1D4ED8"],
+            [1.00, "#0B3D66"],
         ]
         vmin = float(np.nanmin(z_main))
         vmax = float(np.nanmax(z_main))
 
     z_full = np.vstack([z_main, [[np.nan] * 12], z_summary])
     text = [[fmt(v) for v in row] for row in z_full]
-
     ylabels = DAYS_FR + [""] + ["⌀ Ouvrables", "⌀ Weekend", "⌀ Fériés", "⌀ Mensuelle"]
 
-    # Rich hover text
     custom = []
     for r in range(7):
         custom.append([f"<b>{DAYS_FR[r]} · {MONTHS_FR[c]}</b><br>Conso : {fmt(pivot.iloc[r, c])}{unit}"
@@ -89,17 +93,19 @@ def get_figure(mode: str = "absolu"):
     fig = go.Figure(go.Heatmap(
         z=z_full, x=MONTHS_FR, y=ylabels,
         colorscale=colorscale, zmin=vmin, zmax=vmax,
-        text=text, texttemplate="%{text}", textfont=dict(size=11, color="#1f2937"),
+        text=text, texttemplate="%{text}",
+        textfont=dict(size=11, color=PALETTE["primary"]),
         customdata=custom, hovertemplate="%{customdata}<extra></extra>",
         colorbar=dict(title=colorbar_title, thickness=15, tickfont=dict(size=11)),
         xgap=3, ygap=3,
     ))
     fig.add_shape(type="line", x0=-0.5, x1=11.5, y0=7.5, y1=7.5,
-                  line=dict(color="#9ca3af", width=1.5, dash="dot"))
+                  line=dict(color=PALETTE["muted"], width=1.5, dash="dot"))
 
     fig.update_layout(**base_layout(
         "Consommation électrique moyenne par jour et mois",
-        "Moyenne 2022–2024 · tous postes · " + ("% d'écart à la moyenne" if mode == "ecart" else "MWh/jour"),
+        "Moyenne 2022–2024 · tous postes · "
+        + ("% d'écart à la moyenne" if mode == "ecart" else "MWh/jour"),
         height=580,
     ))
     fig.update_layout(

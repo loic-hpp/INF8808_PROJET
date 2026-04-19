@@ -13,21 +13,37 @@ import pandas as pd
 # Canonical palette (Hydro-Québec inspired)
 # ───────────────────────────────────────────────────────────────
 PALETTE = {
-    "primary":   "#00557F",   # HQ deep blue
-    "accent":    "#009FE3",   # HQ light blue
-    "warm":      "#F28C28",   # pointe / warning orange
-    "hot":       "#DC2626",   # défi rouge
-    "cool":      "#16A34A",   # succès vert
-    "muted":     "#6B7280",   # référence gris
-    "bg_soft":   "#FAFBFC",
-    "grid":      "rgba(200,200,200,0.4)",
-    "poste_A":   "#00557F",
-    "poste_B":   "#78BE20",
-    "poste_C":   "#009FE3",
-    "season_winter":  "#1E40AF",
-    "season_spring":  "#16A34A",
-    "season_summer":  "#F59E0B",
-    "season_autumn":  "#B45309",
+    # Core Hydro-Québec blues (unchanged)
+    "primary":   "#00557F",   # HQ deep blue  — headings, strong emphasis
+    "accent":    "#009FE3",   # HQ light blue — main data colour
+    # Former semantic slots, now mapped to a pure blue/blue-grey family
+    "warm":      "#1E3A8A",   # navy — was orange  (used for peak-evening hints)
+    "hot":       "#0B4A6B",   # deeper navy — was red (used for events/défi)
+    "cool":      "#0284C7",   # bright sky-blue — was green (used for success)
+    "muted":     "#64748B",   # slate grey
+    "bg_soft":   "#F8FAFC",
+    "grid":      "rgba(148,163,184,0.35)",
+    # Blue family shades for charts
+    "blue_50":   "#EFF6FF",
+    "blue_100":  "#DBEAFE",
+    "blue_200":  "#BFDBFE",
+    "blue_300":  "#93C5FD",
+    "blue_400":  "#60A5FA",
+    "blue_500":  "#3B82F6",
+    "blue_600":  "#2563EB",
+    "blue_700":  "#1D4ED8",
+    "blue_800":  "#1E40AF",
+    "blue_900":  "#1E3A8A",
+    "navy":      "#0B3D66",
+    # Postes (3 distinguishable blues, no red/green)
+    "poste_A":   "#00557F",   # HQ deep blue
+    "poste_B":   "#60A5FA",   # light sky blue
+    "poste_C":   "#009FE3",   # HQ cyan
+    # Season colors: cold → warm but within a blue-gradient family
+    "season_winter":  "#0B3D66",   # deep navy (very cold)
+    "season_spring":  "#38BDF8",   # sky-blue (fresh)
+    "season_summer":  "#93C5FD",   # pale blue (light, airy)
+    "season_autumn":  "#64748B",   # slate (muted)
 }
 
 SEASONS_ORD = ["Hiver", "Printemps", "Été", "Automne"]
