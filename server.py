@@ -1,19 +1,15 @@
-'''
-    Contains the server to run our application.
-'''
+# -*- coding: utf-8 -*-
+"""
+Entry point for production/Gunicorn deployment.
+Local dev: just run `python app.py` directly.
+"""
 import os
 from flask_failsafe import failsafe
 
 
 @failsafe
 def create_app():
-    '''
-        Gets the underlying Flask server from our Dash app.
-
-        Returns:
-            The server to be run
-    '''
-    # the import is intentionally inside to work with the server failsafe
+    # intentional inside-function import for flask_failsafe
     from app import app  # pylint: disable=import-outside-toplevel
     return app.server
 
