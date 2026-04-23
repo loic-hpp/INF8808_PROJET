@@ -3,26 +3,23 @@
 Hydro-Québec · Gestion de la demande électrique lors des pics hivernaux
 INF8808 — Équipe 25 — Hiver 2026
 
-Scrollytelling dashboard Plotly/Dash avec :
-  • KPI hero dynamique
-  • Sections narratives reliées (problème → programme → impact → mécanisme → échelle)
-  • Filtres interactifs (saison, poste, événement) pilotant plusieurs vizs
-  • Cross-linking : cliquer un point sur viz5 met à jour viz4 + viz6
+Tableau de bord Plotly/Dash, 100% Python (pas de JavaScript custom).
+Storytelling fluide : transitions narratives plutôt que chapitres numérotés.
 """
 from __future__ import annotations
 
 import dash
 from dash import Input, Output, dcc, html
 
-# Data layer (loaded once via lru_cache)
+# Couche de données (chargée une seule fois via lru_cache)
 from data_utils import event_table, global_kpis
 
-# Viz modules (functions return figures)
+# Modules de visualisation (chacun expose get_figure(...))
 from graphiques import viz1a, viz1b, viz2, viz3, viz4, viz5, viz6, viz7, viz8
 
 
 # ─────────────────────────────────────────────────────────────
-# App
+# Instance Dash
 # ─────────────────────────────────────────────────────────────
 app = dash.Dash(
     __name__,
@@ -31,14 +28,16 @@ app = dash.Dash(
 )
 app.title = "Hydro-Québec · Gestion de la demande électrique"
 
+# Pré-calculs partagés
 KPI = global_kpis()
 EVENTS = event_table()
 
 
 # ─────────────────────────────────────────────────────────────
-# Reusable UI atoms
+# Composants réutilisables (UI atoms)
 # ─────────────────────────────────────────────────────────────
 def kpi_card(value: str, label: str, sublabel: str = "") -> html.Div:
+    """Carte KPI simple pour la zone d'en-tête."""
     return html.Div(className="kpi-card", children=[
         html.Div(value, className="kpi-value"),
         html.Div(label, className="kpi-label"),
@@ -46,72 +45,49 @@ def kpi_card(value: str, label: str, sublabel: str = "") -> html.Div:
     ])
 
 
-def chapter(num: int, kicker: str) -> html.Div:
-    return html.Div(className="chapter-header", children=[
-        html.Span(f"CHAPITRE {num:02d}", className="chapter-num"),
-        html.Span(kicker, className="chapter-kicker"),
-    ])
+def lead(text: str) -> html.Div:
+    """
+    Transition narrative douce entre deux sections.
+    Remplace l'ancienne structure 'chapitre N + kicker' par un simple
+    lead-in italique, pour un effet de storytelling continu.
+    """
+    return html.Div(text, className="lead-in")
 
 
-def insight_box(title: str, body: str, icon: str = "💡") -> html.Div:
+def insight_box(title: str, body: str) -> html.Div:
+    """Encart d'enseignement clé à placer près d'une visualisation."""
     return html.Div(className="insight-box", children=[
-        html.Div(className="insight-head", children=[
-            html.Span(icon, className="insight-icon"), html.Strong(title),
-        ]),
+        html.Div(className="insight-head", children=[html.Strong(title)]),
         html.P(body, className="insight-body"),
     ])
 
 
-def viz_section(section_id: str, question: str, figure_id: str,
-                intro: str, outro: str | None = None,
-                controls: html.Div | None = None,
-                insight: html.Div | None = None) -> html.Section:
-    children = [
-        html.H2(question, id=f"title-{section_id}"),
-        html.Div(className="section-body", children=[html.P(intro)]),
-    ]
-    if controls is not None:
-        children.append(controls)
-    children.append(html.Div(className="graph-container",
-                             children=[dcc.Loading(dcc.Graph(id=figure_id,
-                                                             config={"displayModeBar": False}))]))
-    if insight is not None:
-        children.append(insight)
-    if outro:
-        children.append(html.Div(className="section-body",
-                                 children=[html.P(outro)]))
-    return html.Section(id=section_id, className="content-section", children=children)
-
-
 # ─────────────────────────────────────────────────────────────
-# Sidebar (scroll-spy enabled via JS in assets)
+# Navigation latérale
 # ─────────────────────────────────────────────────────────────
 NAV_ITEMS = [
-    ("hero",     "Accueil",            ""),
-    ("viz1",     "Météo",              "01"),
-    ("viz2",     "Calendrier",         "02"),
-    ("viz3",     "Profils horaires",   "03"),
-    ("viz4",     "Impact GLD",         "04"),
-    ("viz5",     "Efficacité",         "05"),
-    ("viz6",     "Thermostats",        "06"),
-    ("viz7",     "Participation",      "07"),
-    ("viz8",     "Postes A/B/C",       "08"),
-    ("synthese", "Synthèse",           ""),
+    ("hero",     "Accueil"),
+    ("viz1",     "Météo"),
+    ("viz2",     "Calendrier"),
+    ("viz3",     "Profils horaires"),
+    ("viz4",     "Impact GLD"),
+    ("viz5",     "Efficacité"),
+    ("viz6",     "Thermostats"),
+    ("viz7",     "Participation"),
+    ("viz8",     "Postes A/B/C"),
+    ("synthese", "Synthèse"),
 ]
 
 sidebar = html.Nav(id="sidebar", children=[
     html.Div(className="sidebar-logo", children=[
-        html.Img(src="/assets/logo.svg", className="sidebar-mark",
-                 alt="Hilo GLD"),
         html.Div(children=[
             html.Div("Gestion de la demande", className="sidebar-brand"),
             html.Div("Hilo · GLD", className="sidebar-sub"),
         ]),
     ]),
     html.Ul([
-        html.Li(html.A([html.Span(num, className="nav-num"), html.Span(label)],
-                       href=f"#{sid}", className="nav-link", **{"data-target": sid}))
-        for sid, label, num in NAV_ITEMS
+        html.Li(html.A(label, href=f"#{sid}", className="nav-link"))
+        for sid, label in NAV_ITEMS
     ]),
     html.Div(className="sidebar-footer", children=[
         html.Div("INF8808 · Équipe 25", className="sidebar-team"),
@@ -121,7 +97,7 @@ sidebar = html.Nav(id="sidebar", children=[
 
 
 # ─────────────────────────────────────────────────────────────
-# Hero + KPIs
+# En-tête (hero) + bandeau de KPIs
 # ─────────────────────────────────────────────────────────────
 hero = html.Section(id="hero", className="hero-section", children=[
     html.Div(className="hero-content", children=[
@@ -138,12 +114,12 @@ hero = html.Section(id="hero", className="hero-section", children=[
             "les événements de gestion locale de la demande (GLD) ?"
         ]),
         html.Div(className="hero-meta", children=[
-            html.Span(f"📅 {KPI['date_min']} → {KPI['date_max']}"),
-            html.Span(f"📊 {KPI['n_obs']:,} observations horaires".replace(",", " ")),
-            html.Span(f"📍 Région de Montréal · 3 postes"),
+            html.Span(f"{KPI['date_min']} → {KPI['date_max']}"),
+            html.Span(f"{KPI['n_obs']:,} observations horaires".replace(",", " ")),
+            html.Span("Région de Montréal · 3 postes"),
         ]),
         html.Div(className="hero-scroll-cue", children=[
-            html.Span("Défilez pour explorer"), html.Span("↓", className="scroll-arrow"),
+            html.Span(""),
         ]),
     ]),
     html.Div(className="kpi-strip", children=[
@@ -153,7 +129,7 @@ hero = html.Section(id="hero", className="hero-section", children=[
         kpi_card(f"{KPI['best_reduction_pct']:.0f}%", "meilleure performance",
                  "un seul événement"),
         kpi_card(f"{KPI['pct_events_positive']:.0f}%", "événements positifs",
-                 f"le reste = effet contre-productif"),
+                 "le reste = effet contre-productif"),
         kpi_card(f"{KPI['n_tstats_max']:,}".replace(",", " "),
                  "thermostats Hilo max", "connectés simultanément"),
     ]),
@@ -161,10 +137,10 @@ hero = html.Section(id="hero", className="hero-section", children=[
 
 
 # ─────────────────────────────────────────────────────────────
-# Chapter 1 — Le contexte
+# Contexte : pourquoi ce tableau de bord existe
 # ─────────────────────────────────────────────────────────────
 contexte = html.Section(id="contexte", className="content-section narrative", children=[
-    chapter(1, "Le contexte"),
+    lead("Pour commencer, posons le décor."),
     html.H2("Pourquoi gérer la demande lors des pics hivernaux ?"),
     html.Div(className="section-body two-col", children=[
         html.Div([
@@ -190,7 +166,7 @@ contexte = html.Section(id="contexte", className="content-section narrative", ch
                 " un événement GLD ?",
             ]),
             html.Div(className="audience-tag", children=[
-                html.Span("🎯 Public cible : "),
+                html.Span("Public cible : "),
                 html.Span("analystes et gestionnaires Hydro-Québec"),
             ]),
         ]),
@@ -199,16 +175,14 @@ contexte = html.Section(id="contexte", className="content-section narrative", ch
 
 
 # ─────────────────────────────────────────────────────────────
-# Chapter 2 — Météo & consommation (Viz 1)
+# Section 1 — Météo & consommation (viz1)
 # ─────────────────────────────────────────────────────────────
 viz1_section = html.Section(id="viz1", className="content-section", children=[
-    chapter(2, "Météo vs consommation"),
+    lead("Avant de parler du programme lui-même, regardons ce qu'il doit apprivoiser : la météo."),
     html.H2("Quelles conditions météo font exploser la demande ?"),
     html.Div(className="section-body", children=[
         html.P([
-            "Avant de comprendre le programme, il faut comprendre ce qu'il doit ",
-            html.Em("domestiquer"),
-            " : la météo. Nous commençons par un classement des variables les plus corrélées ",
+            "Nous commençons par un classement des variables les plus corrélées ",
             "à la consommation, puis nous regardons la forme exacte de ces relations.",
         ]),
     ]),
@@ -229,7 +203,6 @@ viz1_section = html.Section(id="viz1", className="content-section", children=[
         "Avec r ≈ −0,72 en hiver, la température extérieure est la variable qui dicte la consommation. "
         "Les autres variables (vent, humidité, neige) sont bien plus marginales — mais la neige "
         "coïncide souvent avec le grand froid.",
-        "🌡️",
     ),
     html.Div(className="section-body", children=[
         html.P("Regardons maintenant la forme exacte de ces relations :"),
@@ -249,10 +222,10 @@ viz1_section = html.Section(id="viz1", className="content-section", children=[
 
 
 # ─────────────────────────────────────────────────────────────
-# Chapter 3 — Calendrier (Viz 2)
+# Section 2 — Calendrier (viz2)
 # ─────────────────────────────────────────────────────────────
 viz2_section = html.Section(id="viz2", className="content-section", children=[
-    chapter(3, "Vue calendrier"),
+    lead("Zoomons maintenant sur la distribution temporelle — quels jours, quels mois concentrent vraiment la demande."),
     html.H2("Quels jours et quels mois concentrent la demande ?"),
     html.Div(className="section-body", children=[
         html.P([
@@ -278,16 +251,15 @@ viz2_section = html.Section(id="viz2", className="content-section", children=[
         "L'hiver est une autre planète",
         "Les fins de semaine de février culminent à près de 20 MWh/j alors que les étés plafonnent sous 8 MWh/j. "
         "Décembre voit une anomalie liée aux fêtes — les jours fériés battent tous les records.",
-        "📅",
     ),
 ])
 
 
 # ─────────────────────────────────────────────────────────────
-# Chapter 4 — Profils horaires (Viz 3)
+# Section 3 — Profils horaires (viz3)
 # ─────────────────────────────────────────────────────────────
 viz3_section = html.Section(id="viz3", className="content-section", children=[
-    chapter(4, "Profils horaires"),
+    lead("À l'intérieur d'une journée, la consommation n'est pas lissée non plus."),
     html.H2("À quelles heures la demande explose-t-elle ?"),
     html.Div(className="section-body", children=[
         html.P([
@@ -310,68 +282,60 @@ viz3_section = html.Section(id="viz3", className="content-section", children=[
     insight_box(
         "Deux pointes, une fenêtre d'action",
         "En hiver, les pics atteignent ~230 kWh/h contre ~85 en été — un ratio de 2,7×. "
-        "Les pics rouges sur les roses correspondent aux 6 heures ciblées par les défis Hilo. "
+        "Ces pointes correspondent aux 6 heures ciblées par les défis Hilo. "
         "C'est là que le programme doit frapper.",
-        "⏰",
     ),
 ])
 
 
 # ─────────────────────────────────────────────────────────────
-# Chapter 5 — Impact GLD + exploration d'événement (Viz 4, 5, 6 cross-linked)
+# Section 4 — Impact GLD + exploration d'événement (viz4, viz5, viz6 liés)
 # ─────────────────────────────────────────────────────────────
-# Build scannable event labels with visual cues (emoji) for réussi/échoué + matin/soir.
-# Colour-neutral circle emoji instead of ✅/🟡/❌ to stay on brand (tout bleu).
 def _event_label(row):
-    if row["reduction_pct"] >= 20:
-        status = "🔵"      # strong success
-    elif row["reduction_pct"] >= 0:
-        status = "🔹"      # modest success
-    else:
-        status = "⚪"      # counter-productive
-    moment = "🌅" if row["periode_jour"] == "matin" else "🌙"
+    """Format compact et scannable pour chaque événement dans le sélecteur."""
     date_only = row["date_str"].split("-matin")[0].split("-soir")[0]
-    return (f"{status} {moment}  {date_only}  ·  "
+    period = "matin" if row["periode_jour"] == "matin" else "soir"
+    return (f"{date_only}  ·  {period}  ·  "
             f"{row['heure_debut']}h-{row['heure_fin']+1}h  ·  "
             f"{row['temperature_ext']:+.0f}°C  ·  "
             f"réd. {row['reduction_pct']:+.0f}%")
 
-event_options = [{"label": "📊  Moyenne sur tous les événements (vue par défaut)", "value": "__all__"}]
-# sort events best→worst so the top of the list shows the program at its best
+
+# Tri meilleur → pire : les plus gros succès apparaissent en tête de liste
+event_options = [{"label": "Moyenne sur tous les événements (vue par défaut)", "value": "__all__"}]
 for _, row in EVENTS.sort_values("reduction_pct", ascending=False).iterrows():
     event_options.append({"label": _event_label(row), "value": row["date_str"]})
 
 
 viz4_section = html.Section(id="viz4", className="content-section", children=[
-    chapter(5, "L'impact du programme"),
+    lead("C'est ici que le programme Hilo entre en scène."),
     html.H2("Le programme Hilo réduit-il vraiment la consommation ?"),
     html.Div(className="section-body", children=[
         html.P([
             "Voici le cœur de l'analyse. Pour chaque événement GLD, nous comparons la ",
             "consommation réelle à un ", html.Strong("baseline"),
             " (mêmes heures, mêmes postes, mais en hiver sans défi). ",
-            "L'aire verte visualise l'énergie économisée.",
+            "L'aire colorée visualise l'énergie économisée.",
         ]),
         html.P(className="helper-note", children=[
-            html.Span("💡", className="helper-icon"),
             html.Span([
-                "Par défaut, les courbes montrent la ", html.Strong("moyenne sur les 46 événements"),
+                "Par défaut, les courbes montrent la ",
+                html.Strong(f"moyenne sur les {KPI['n_events']} événements"),
                 ". Pour explorer un cas précis, utilisez le sélecteur ci-dessous ",
-                html.Em("ou"), " cliquez un point dans le graphique du chapitre 6."
+                html.Em("ou"), " cliquez un point dans le graphique d'efficacité plus bas."
             ]),
         ]),
     ]),
     html.Div(className="event-picker-wrap", children=[
         html.Div(className="event-picker-header", children=[
             html.Div(className="picker-left", children=[
-                html.Span("🎯", className="picker-emoji"),
                 html.Div(children=[
                     html.Div("Événement affiché", className="picker-title"),
                     html.Div("Tous les événements (moyenne)",
                              id="picker-subtitle", className="picker-subtitle"),
                 ]),
             ]),
-            html.Button("↺ Voir la moyenne", id="event-reset", n_clicks=0,
+            html.Button("Voir la moyenne", id="event-reset", n_clicks=0,
                         className="reset-btn"),
         ]),
         dcc.Dropdown(
@@ -381,10 +345,10 @@ viz4_section = html.Section(id="viz4", className="content-section", children=[
             placeholder="Choisir un événement spécifique…",
         ),
         html.Div(className="picker-legend", children=[
-            html.Span("🔵 réussi (>20%)"), html.Span("·"),
-            html.Span("🔹 modéré (0–20%)"), html.Span("·"),
-            html.Span("⚪ contre-productif (<0%)"), html.Span("·"),
-            html.Span("🌅 matin  ·  🌙 soir"),
+            html.Span("réussi (>20%)"), html.Span("·"),
+            html.Span("modéré (0–20%)"), html.Span("·"),
+            html.Span("contre-productif (<0%)"), html.Span("·"),
+            html.Span("matin ou soir"),
         ]),
         html.Div(id="event-badge", className="event-badge-wrap"),
     ]),
@@ -396,13 +360,15 @@ viz4_section = html.Section(id="viz4", className="content-section", children=[
         "La baisse est nette pendant la phase de défi. Le préchauffage facultatif crée une hausse "
         "de consommation avant 0h (stockage thermique). À la fin du défi (+4h), un rebond marqué "
         "est inévitable car les logements doivent retrouver leur consigne.",
-        "⚡",
     ),
 ])
 
 
+# ─────────────────────────────────────────────────────────────
+# Section 5 — Efficacité (viz5)
+# ─────────────────────────────────────────────────────────────
 viz5_section = html.Section(id="viz5", className="content-section", children=[
-    chapter(6, "Quand le programme fonctionne-t-il ?"),
+    lead("Mais Hilo ne fonctionne pas toujours avec la même force."),
     html.H2("L'efficacité varie-t-elle selon la température et l'heure ?"),
     html.Div(className="section-body", children=[
         html.P([
@@ -411,8 +377,8 @@ viz5_section = html.Section(id="viz5", className="content-section", children=[
             "— les bâtiments luttent juste pour conserver leur température.",
         ]),
         html.P([
-            html.Em("👆 Astuce : "),
-            "cliquez un point sur le graphique pour charger cet événement dans les visualisations précédente et suivante.",
+            html.Em("Astuce : "),
+            "cliquez un point sur le graphique pour charger cet événement dans les visualisations liées.",
         ]),
     ]),
     html.Div(className="graph-container",
@@ -424,13 +390,15 @@ viz5_section = html.Section(id="viz5", className="content-section", children=[
         f"Sur {KPI['n_events']} événements, {100 - KPI['pct_events_positive']:.0f}% sont contre-productifs "
         "(réduction < 0%). Ils surviennent presque tous par grand froid extrême : le chauffage compensatoire "
         "annule l'effet du défi.",
-        "🧊",
     ),
 ])
 
 
+# ─────────────────────────────────────────────────────────────
+# Section 6 — Mécanisme (viz6)
+# ─────────────────────────────────────────────────────────────
 viz6_section = html.Section(id="viz6", className="content-section", children=[
-    chapter(7, "Le mécanisme"),
+    lead("Pourquoi ces défis réussissent-ils ? Regardons ce que font concrètement les thermostats."),
     html.H2("Comment les thermostats Hilo réagissent-ils ?"),
     html.Div(className="section-body", children=[
         html.P([
@@ -448,22 +416,21 @@ viz6_section = html.Section(id="viz6", className="content-section", children=[
         "La chute de consigne est brutale (instantanée), mais la température intérieure ne suit "
         "qu'à moitié, protégeant le confort des participants. L'écart Δ entre consigne et intérieure "
         "pendant le défi est la signature de l'inertie thermique.",
-        "🌡️",
     ),
 ])
 
 
 # ─────────────────────────────────────────────────────────────
-# Chapter 8 — Participation (Viz 7)
+# Section 7 — Participation (viz7)
 # ─────────────────────────────────────────────────────────────
 viz7_section = html.Section(id="viz7", className="content-section", children=[
-    chapter(8, "Le rôle de l'échelle"),
+    lead("Et si l'on changeait d'échelle ? Le nombre de participants joue-t-il autant qu'on le croit ?"),
     html.H2("Plus de participants = plus de réduction ?"),
     html.Div(className="section-body", children=[
         html.P([
             "Chaque événement est représenté par un point. À gauche, selon le nombre de clients ; ",
-            "à droite, selon le nombre de thermostats. Les ",
-            html.Strong("points rouges"), " sont les événements contre-productifs.",
+            "à droite, selon le nombre de thermostats. Les points en bleu pâle "
+            "sont les événements contre-productifs.",
         ]),
     ]),
     html.Div(className="graph-container",
@@ -475,17 +442,16 @@ viz7_section = html.Section(id="viz7", className="content-section", children=[
         "La corrélation est plus forte avec le nombre de thermostats (r ≈ 0,57) qu'avec le nombre "
         "de clients (r ≈ 0,34) : c'est bien le nombre d'actionneurs — pas de foyers — qui détermine "
         "la capacité de modulation.",
-        "🔌",
     ),
 ])
 
 
 # ─────────────────────────────────────────────────────────────
-# Chapter 9 — Postes (Viz 8)
+# Section 8 — Postes A/B/C (viz8)
 # ─────────────────────────────────────────────────────────────
 viz8_section = html.Section(id="viz8", className="content-section", children=[
-    chapter(9, "Hétérogénéité des postes"),
-    html.H2("Les trois postes se comportent-ils pareil ?"),
+    lead("Enfin, tous les postes ne sont pas logés à la même enseigne."),
+    html.H2("Les trois postes se comportent-ils pareillement ?"),
     html.Div(className="section-body", children=[
         html.P([
             "Les postes A, B et C agrègent des clientèles différentes. ",
@@ -510,7 +476,6 @@ viz8_section = html.Section(id="viz8", className="content-section", children=[
         "Saisonnalité universelle",
         "Malgré les écarts absolus, les trois postes suivent la même courbe saisonnière : "
         "maximum en hiver, minimum en été. Le chauffage électrique est le déterminant commun.",
-        "🏘️",
     ),
 ])
 
@@ -519,11 +484,11 @@ viz8_section = html.Section(id="viz8", className="content-section", children=[
 # Synthèse finale
 # ─────────────────────────────────────────────────────────────
 synthese = html.Section(id="synthese", className="content-section synthesis", children=[
-    chapter(10, "Ce que nous avons appris"),
+    lead("En rassemblant les pièces, un constat simple se dégage."),
     html.H2("Synthèse"),
     html.Div(className="synthesis-grid", children=[
         html.Div(className="synthesis-card primary", children=[
-            html.H3("▲ Le programme fonctionne"),
+            html.H3("Le programme fonctionne"),
             html.P([
                 "En moyenne ", html.Strong(f"{KPI['mean_reduction_pct']:.0f}% de réduction"),
                 f" sur {KPI['n_events']} événements, avec des pics à {KPI['best_reduction_pct']:.0f}%. ",
@@ -531,21 +496,21 @@ synthese = html.Section(id="synthese", className="content-section synthesis", ch
             ]),
         ]),
         html.Div(className="synthesis-card warning", children=[
-            html.H3("⚠️ Limite thermique à −20°C"),
+            html.H3("Limite thermique à −20°C"),
             html.P([
                 "Le programme perd son efficacité lors des grands froids extrêmes. ",
                 "Repenser la stratégie ces jours-là : préchauffage plus agressif ou fenêtres plus courtes."
             ]),
         ]),
         html.Div(className="synthesis-card", children=[
-            html.H3("🔄 L'effet rebond est réel"),
+            html.H3("L'effet rebond est réel"),
             html.P([
                 "À la fin du défi (+4h), un rebond de ~53% par rapport à la référence est observé. ",
                 "Il doit être intégré dans la planification réseau pour ne pas créer un nouveau pic."
             ]),
         ]),
         html.Div(className="synthesis-card", children=[
-            html.H3("📈 Scaling par thermostats"),
+            html.H3("Scaling par thermostats"),
             html.P([
                 "L'impact dépend du nombre de ", html.Strong("thermostats"),
                 " connectés (r = 0,57), pas du nombre de foyers. ",
@@ -557,7 +522,7 @@ synthese = html.Section(id="synthese", className="content-section synthesis", ch
 
 
 # ─────────────────────────────────────────────────────────────
-# Team footer
+# Pied de page — équipe (un seul titre, pas de duplication)
 # ─────────────────────────────────────────────────────────────
 equipe = html.Section(id="equipe", className="content-section team-section", children=[
     html.H2("Équipe 25 · INF8808 · Hiver 2026"),
@@ -574,7 +539,7 @@ equipe = html.Section(id="equipe", className="content-section team-section", chi
 
 
 # ─────────────────────────────────────────────────────────────
-# Main layout
+# Layout principal
 # ─────────────────────────────────────────────────────────────
 app.layout = html.Div(id="app-container", children=[
     sidebar,
@@ -596,7 +561,7 @@ app.layout = html.Div(id="app-container", children=[
 
 
 # ─────────────────────────────────────────────────────────────
-# CALLBACKS — real interactivity
+# Callbacks — interactivité 100% Python (aucun JS custom nécessaire)
 # ─────────────────────────────────────────────────────────────
 @app.callback(Output("graph-viz1a", "figure"), Input("viz1-saison", "value"))
 def _cb_viz1a(saison):
@@ -620,8 +585,9 @@ def _cb_viz3(poste):
     return viz3.get_figure(poste)
 
 
-# Cross-linking: clicking a point on viz5 populates the picker, which drives viz4 + viz6.
-# Single source of truth = the picker's value. No intermediate store → no feedback loop.
+# Cross-linking : un clic sur viz5 (ou un clic sur "Voir la moyenne") met à
+# jour la valeur du sélecteur, qui à son tour pilote viz4 et viz6.
+# Source unique de vérité = la valeur du Dropdown → pas de boucle de feedback.
 @app.callback(
     Output("event-picker", "value"),
     Input("graph-viz5", "clickData"),
@@ -645,20 +611,29 @@ def _cb_set_event(click_data, reset_clicks):
     Input("event-picker", "value"),
 )
 def _cb_event_views(event_value):
+    """Mise à jour synchronisée de viz4, viz6 et du badge d'informations."""
+    # Cas « vue par défaut » : moyenne sur l'ensemble des événements
     if not event_value or event_value == "__all__":
         return (
             viz4.get_figure(None),
             viz6.get_figure(None),
-            html.Div(),   # empty badge
+            html.Div(),   # badge vide
             f"Tous les événements ({KPI['n_events']} au total · moyenne)",
         )
+
+    # Cas « événement spécifique »
     row = EVENTS[EVENTS["date_str"] == event_value]
     if row.empty:
         return viz4.get_figure(None), viz6.get_figure(None), html.Div(), "—"
+
     r = row.iloc[0]
     date_only = r["date_str"].split("-matin")[0].split("-soir")[0]
-    period_label = "pointe matinale 🌅" if r["periode_jour"] == "matin" else "pointe du soir 🌙"
-    subtitle = f"{date_only} · {period_label} ({r['heure_debut']}h → {r['heure_fin']+1}h) · {r['temperature_ext']:+.0f}°C"
+    period_label = "pointe matinale" if r["periode_jour"] == "matin" else "pointe du soir"
+    subtitle = (f"{date_only} · {period_label} "
+                f"({r['heure_debut']}h → {r['heure_fin']+1}h) · "
+                f"{r['temperature_ext']:+.0f}°C")
+
+    # Badge visuel conservant une distinction sémantique (good/bad) via CSS
     badge_class = "event-badge good" if r["reduction_pct"] >= 0 else "event-badge bad"
     badge = html.Div(className=badge_class, children=[
         html.Div(className="badge-main", children=[
@@ -666,10 +641,10 @@ def _cb_event_views(event_value):
             html.Span("de réduction", className="badge-suffix"),
         ]),
         html.Div(className="badge-meta", children=[
-            html.Span(f"🌡️ {r['temperature_ext']:+.1f}°C"),
-            html.Span(f"👥 {r['tstats_moy']} thermostats"),
-            html.Span(f"🕐 {r['heure_debut']}h → {r['heure_fin']+1}h"),
-            html.Span(f"🔆 {r['periode_jour']}"),
+            html.Span(f"Température : {r['temperature_ext']:+.1f}°C"),
+            html.Span(f"Thermostats : {r['tstats_moy']}"),
+            html.Span(f"Heures : {r['heure_debut']}h → {r['heure_fin']+1}h"),
+            html.Span(f"Période : {r['periode_jour']}"),
         ]),
     ])
     return viz4.get_figure(event_value), viz6.get_figure(event_value), badge, subtitle
@@ -680,7 +655,3 @@ def _cb_viz8(mode):
     return viz8.get_figure(mode)
 
 
-# ─────────────────────────────────────────────────────────────
-if __name__ == "__main__":
-    # Dash ≥2.17 uses .run(); older versions use .run_server() — both work on older .run()
-    app.run(debug=True, port=8050)
