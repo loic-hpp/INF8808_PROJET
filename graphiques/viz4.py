@@ -1,156 +1,111 @@
 # -*- coding: utf-8 -*-
 """
-Viz 4 — Profil de consommation avant, pendant et après un événement GLD
+Viz 4 — Profil avant/pendant/après un événement GLD. Palette 100% bleue.
+Phase préchauffage = pale sky band, phase défi = pale navy band.
 """
-
-import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
-
-HQ_BLUE = "#00557F"
-HQ_LIGHT = "#009FE3"
+from data_utils import event_profile, base_layout, PALETTE
 
 
-def get_figure():
-    df = pd.read_csv("assets/data/consommation-clients-evenements-pointe.csv")
-    df["date"] = pd.to_datetime(df["date"])
-    df["month"] = df["date"].dt.month
-    df["is_winter"] = df["month"].isin([12, 1, 2, 3])
+def get_figure(event_date=None):
+    df = event_profile(event_date)
+    x_labels = [f"{o:+d}h" if o != 0 else "0h" for o in df["offset"]]
+    h_vals = df["conso_hilo"].tolist()
+    r_vals = df["conso_ref"].tolist()
 
-    df_ref = df[(df["indicateur_evenement"] == 0) &
-                (df["pre_post_indicateur_evenement"] == 0) &
-                df["is_winter"]]
-    ref_baseline = df_ref.groupby(["poste", "heure_locale"])["energie_totale_consommee"].mean()
+    during_idx = [i for i, o in enumerate(df["offset"]) if 0 <= o <= 3]
+    h_event = np.nanmean([h_vals[i] for i in during_idx])
+    r_event = np.nanmean([r_vals[i] for i in during_idx])
+    reduction = ((r_event - h_event) / r_event * 100) if r_event else 0
 
-    event_dates = df[df["indicateur_evenement"] == 1]["date"].unique()
-
-    hilo_records, ref_records = [], []
-    for ed in event_dates:
-        ev = df[(df["date"] == ed) &
-                (df["indicateur_evenement"] == 1) &
-                (df["heure_locale"] != 16)]
-        if len(ev) == 0:
-            continue
-        start_h = ev["heure_locale"].min()
-        for h_offset in range(-4, 7):
-            target_h = (start_h + h_offset) % 24
-            target_date = ed if h_offset >= 0 else pd.Timestamp(ed) - pd.Timedelta(days=1)
-            subset = df[(df["date"] == target_date) & (df["heure_locale"] == target_h)]
-            if len(subset) > 0:
-                hilo_records.append({"offset": h_offset,
-                                     "conso": subset["energie_totale_consommee"].sum()})
-            ref_h = df_ref[df_ref["heure_locale"] == target_h]
-            by_date = ref_h.groupby("date")["energie_totale_consommee"].sum()
-            if len(by_date) > 0:
-                ref_records.append({"offset": h_offset, "conso": by_date.mean()})
-
-    hilo_curve = pd.DataFrame(hilo_records).groupby("offset")["conso"].mean()
-    ref_curve = pd.DataFrame(ref_records).groupby("offset")["conso"].mean()
-
-    offsets = list(range(-4, 7))
-    x_labels = [f"{o}h" for o in offsets]
-    h_vals = [float(hilo_curve.get(o, np.nan)) for o in offsets]
-    r_vals = [float(ref_curve.get(o, np.nan)) for o in offsets]
-
-    event_idx = [i for i, o in enumerate(offsets) if 0 <= o <= 3]
-    h_event = np.nanmean([h_vals[i] for i in event_idx])
-    r_event = np.nanmean([r_vals[i] for i in event_idx])
-    reduction = (r_event - h_event) / r_event * 100
-    rebound = (h_vals[8] - r_vals[8]) / r_vals[8] * 100 if not np.isnan(r_vals[8]) else 0
-
-    GRID = "rgba(200,200,200,0.4)"
-    BG = "#fafafa"
+    idx_4 = df.index[df["offset"] == 4][0] if (df["offset"] == 4).any() else None
+    rebound = 0
+    if idx_4 is not None and r_vals[idx_4] and not np.isnan(h_vals[idx_4]):
+        rebound = (h_vals[idx_4] - r_vals[idx_4]) / r_vals[idx_4] * 100
 
     fig = go.Figure()
 
-    fig.add_vrect(x0="-2h", x1="0h", fillcolor="#f59e0b", opacity=0.10,
+    # Phase bands — both blue-family shades
+    fig.add_vrect(x0="-2h", x1="0h", fillcolor=PALETTE["blue_100"], opacity=0.55,
                   layer="below", line_width=0,
-                  annotation_text="Préchauffage<br>optionnel",
+                  annotation_text="Préchauffage",
                   annotation_position="top left",
-                  annotation_font=dict(color="#92400e", size=11))
-    fig.add_vrect(x0="0h", x1="4h", fillcolor="#ef4444", opacity=0.10,
+                  annotation_font=dict(color=PALETTE["primary"], size=11))
+    fig.add_vrect(x0="0h", x1="+4h", fillcolor=PALETTE["blue_200"], opacity=0.55,
                   layer="below", line_width=0,
-                  annotation_text="Défi GLD<br>actif",
+                  annotation_text="Défi GLD",
                   annotation_position="top right",
-                  annotation_font=dict(color="#991b1b", size=11))
-    for xv in ["0h", "4h"]:
-        fig.add_vline(x=xv, line_dash="dash", line_color="#ef4444",
+                  annotation_font=dict(color=PALETTE["navy"], size=11))
+    for xv in ("0h", "+4h"):
+        fig.add_vline(x=xv, line_dash="dash", line_color=PALETTE["navy"],
                       line_width=1.5, opacity=0.7)
 
+    # Savings area = pale blue fill (where hilo < ref)
     fig.add_trace(go.Scatter(
-        x=x_labels, y=r_vals,
-        fill=None, mode="lines",
-        line_color="rgba(0,0,0,0)",
-        showlegend=False, hoverinfo="skip",
+        x=x_labels, y=r_vals, mode="lines",
+        line_color="rgba(0,0,0,0)", showlegend=False, hoverinfo="skip",
     ))
     fill_y = [h if (not np.isnan(h) and not np.isnan(r) and r > h) else np.nan
               for h, r in zip(h_vals, r_vals)]
     fig.add_trace(go.Scatter(
-        x=x_labels, y=fill_y,
-        fill="tonexty",
-        fillcolor="rgba(22,163,74,0.15)",
-        mode="lines",
-        line_color="rgba(0,0,0,0)",
-        showlegend=False, hoverinfo="skip",
+        x=x_labels, y=fill_y, mode="lines",
+        fill="tonexty", fillcolor="rgba(0, 159, 227, 0.18)",   # HQ accent @18%
+        line_color="rgba(0,0,0,0)", showlegend=False, hoverinfo="skip",
     ))
 
+    # Reference — slate grey (neutral / baseline), dotted
     fig.add_trace(go.Scatter(
-        x=x_labels, y=r_vals,
-        mode="lines+markers",
-        name="Référence — hiver sans GLD",
-        line=dict(color="#6b7280", width=2.5, dash="dot"),
-        marker=dict(size=7, color="#6b7280"),
+        x=x_labels, y=r_vals, mode="lines+markers",
+        name="Référence (hiver sans GLD)",
+        line=dict(color=PALETTE["muted"], width=2.5, dash="dot"),
+        marker=dict(size=7, color=PALETTE["muted"]),
         hovertemplate="<b>%{x}</b><br>Référence : %{y:.0f} kWh<extra></extra>",
     ))
-
+    # Actual Hilo consumption — HQ accent blue
     fig.add_trace(go.Scatter(
-        x=x_labels, y=h_vals,
-        mode="lines+markers",
-        name="Clients Hilo — tous postes confondus",
-        line=dict(color=HQ_LIGHT, width=2.8),
-        marker=dict(size=8, color=HQ_LIGHT),
+        x=x_labels, y=h_vals, mode="lines+markers",
+        name="Clients Hilo (tous postes)",
+        line=dict(color=PALETTE["accent"], width=3),
+        marker=dict(size=9, color=PALETTE["accent"],
+                    line=dict(color="white", width=1.5)),
         hovertemplate="<b>%{x}</b><br>Hilo : %{y:.0f} kWh<extra></extra>",
     ))
 
-    fig.add_annotation(
-        x="2h", y=h_vals[6],
-        text=f"\u2193 {reduction:.0f}%<br>pendant le défi",
-        showarrow=True, arrowhead=2, ax=60, ay=-50,
-        font=dict(color="#15803d", size=11),
-        bgcolor="#dcfce7", bordercolor="#86efac",
-    )
-    fig.add_annotation(
-        x="4h", y=h_vals[8],
-        text=f"Effet rebond<br>(+{rebound:.0f}% vs référence)",
-        showarrow=True, arrowhead=2, ax=70, ay=-40,
-        font=dict(color="#dc2626", size=11),
-        bgcolor="#fee2e2", bordercolor="#fca5a5",
-    )
+    # Annotations — use blue shades for good/bad instead of green/red
+    mid_i = during_idx[len(during_idx) // 2] if during_idx else None
+    if mid_i is not None and h_vals[mid_i] is not None and not np.isnan(h_vals[mid_i]):
+        fig.add_annotation(
+            x=f"+{df['offset'].iloc[mid_i]}h",
+            y=h_vals[mid_i],
+            text=f"<b>↓ {reduction:.0f}%</b><br><span style='font-size:10px'>pendant le défi</span>",
+            showarrow=True, arrowhead=2, ax=40, ay=-55,
+            font=dict(color=PALETTE["primary"], size=12),
+            bgcolor=PALETTE["blue_100"], bordercolor=PALETTE["accent"],
+            borderwidth=1,
+        )
+    if idx_4 is not None and not np.isnan(h_vals[idx_4]):
+        fig.add_annotation(
+            x="+4h", y=h_vals[idx_4],
+            text=f"<b>Effet rebond</b><br><span style='font-size:10px'>+{rebound:.0f}% vs référence</span>",
+            showarrow=True, arrowhead=2, ax=70, ay=-40,
+            font=dict(color=PALETTE["navy"], size=12),
+            bgcolor=PALETTE["blue_200"], bordercolor=PALETTE["navy"],
+            borderwidth=1,
+        )
 
-    fig.update_layout(
-        font=dict(family="Arial", size=13, color="#333"),
-        paper_bgcolor="white",
-        plot_bgcolor=BG,
-        margin=dict(t=80, b=70, l=80, r=40),
-        title=dict(
-            text="Profil de consommation avant, pendant et après un événement GLD",
-            font=dict(size=16, color=HQ_BLUE),
-        ),
-        xaxis=dict(title="Heures par rapport au début de l'événement GLD",
-                   showgrid=True, gridcolor=GRID, zeroline=False),
-        yaxis=dict(
-            title="Consommation totale (kWh) — tous postes",
-            showgrid=True,
-            gridcolor=GRID,
-            zeroline=False,
-            range=[0, max(
-                max([v for v in h_vals if not np.isnan(v)]),
-                max([v for v in r_vals if not np.isnan(v)])
-            ) * 1.1]
-        ),
-        legend=dict(x=0.01, y=0.99, bgcolor="rgba(255,255,255,0.9)",
-                    bordercolor="#ddd", borderwidth=1),
+    title_suffix = f" · {event_date}" if event_date else " · moyenne sur tous les événements"
+    fig.update_layout(**base_layout(
+        "Profil de consommation avant, pendant et après un événement GLD" + title_suffix,
+        "Zone bleue claire = énergie économisée grâce au programme Hilo",
         height=500,
+    ))
+    fig.update_layout(
+        xaxis=dict(title="Heures par rapport au début de l'événement",
+                   showgrid=True, gridcolor=PALETTE["grid"], zeroline=False),
+        yaxis=dict(title="Consommation totale (kWh)",
+                   showgrid=True, gridcolor=PALETTE["grid"], zeroline=False),
+        legend=dict(x=0.01, y=0.99, bgcolor="rgba(255,255,255,0.95)",
+                    bordercolor=PALETTE["blue_100"], borderwidth=1),
     )
-
     return fig

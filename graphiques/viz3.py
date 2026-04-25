@@ -1,140 +1,89 @@
 # -*- coding: utf-8 -*-
 """
-Viz 3 — Graphiques polaires (rose charts) : consommation horaire par saison
+Viz 3 — Roses polaires par saison. Palette 100% bleue : heures de pointe
+en navy foncé, heures hors-pointe en bleu ciel clair.
 """
-
-import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-
-HQ_BLUE = "#00557F"
-HQ_LIGHT = "#009FE3"
+from data_utils import load_data, base_layout, SEASONS_ORD, PALETTE
 
 
-def get_figure():
-    df = pd.read_csv("assets/data/consommation-clients-evenements-pointe.csv")
-    df["date"] = pd.to_datetime(df["date"])
-    df["month"] = df["date"].dt.month
+def get_figure(poste=None):
+    df = load_data()
+    if poste and poste != "Tous":
+        df = df[df["poste"] == poste]
+    hourly = (df.groupby(["saison", "heure_locale"])["energie_totale_consommee"]
+                .mean().reset_index())
 
-    def get_season(m):
-        if m in [12, 1, 2]:
-            return "Hiver"
-        elif m in [3, 4, 5]:
-            return "Printemps"
-        elif m in [6, 7, 8]:
-            return "Été"
-        else:
-            return "Automne"
-
-    df["saison"] = df["month"].apply(get_season)
-    hourly = df.groupby(["saison", "heure_locale"])["energie_totale_consommee"].mean().reset_index()
-
-    SEASONS_ORD = ["Hiver", "Printemps", "Été", "Automne"]
-
-    global_max = max(
-        hourly[hourly["saison"] == s]["energie_totale_consommee"].max()
-        for s in SEASONS_ORD
-    ) * 1.08
+    global_max = hourly["energie_totale_consommee"].max() * 1.08
 
     fig = make_subplots(
         rows=2, cols=2,
-        specs=[[{"type": "polar"}, {"type": "polar"}],
-               [{"type": "polar"}, {"type": "polar"}]],
+        specs=[[{"type": "polar"}] * 2, [{"type": "polar"}] * 2],
         subplot_titles=SEASONS_ORD,
-        horizontal_spacing=0.05,
-        vertical_spacing=0.12,
+        horizontal_spacing=0.05, vertical_spacing=0.14,
     )
-
-    for ann in fig.layout.annotations:
-        if ann.text in SEASONS_ORD:
-            ann.y += 0.03
-            ann.font.size = 15
-
     positions = [(1, 1), (1, 2), (2, 1), (2, 2)]
-
-    positions_paper = {
-        "Hiver": (0.22, 0.78),
-        "Printemps": (0.78, 0.78),
-        "Été": (0.22, 0.22),
-        "Automne": (0.78, 0.22),
-    }
+    PEAK_HOURS = {7, 8, 9, 17, 18, 19}
 
     for (row, col), saison in zip(positions, SEASONS_ORD):
         data = hourly[hourly["saison"] == saison].sort_values("heure_locale")
+        if data.empty:
+            continue
         angles = (data["heure_locale"] * 360 / 24).tolist()
         values = data["energie_totale_consommee"].tolist()
         hours = data["heure_locale"].tolist()
         avg = data["energie_totale_consommee"].mean()
 
+        # Peak hours → deep HQ primary blue; off-peak → light sky blue
+        colors = [PALETTE["primary"] if h in PEAK_HOURS else PALETTE["blue_300"]
+                  for h in hours]
+        opacities = [0.95 if h in PEAK_HOURS else 0.75 for h in hours]
+
         fig.add_trace(go.Barpolar(
-            r=values,
-            theta=angles,
+            r=values, theta=angles,
             width=[360 / 24] * len(values),
-            marker=dict(
-                color=HQ_LIGHT,
-                opacity=0.82,
-                line=dict(color="white", width=0.6),
-            ),
-            hovertemplate=(
-                "<b>%{customdata}h</b><br>"
-                f"{saison}<br>"
-                "Conso : %{r:.0f} kWh<extra></extra>"
-            ),
-            customdata=hours,
-            name=saison,
-            showlegend=False,
+            marker=dict(color=colors, opacity=opacities,
+                        line=dict(color="white", width=0.6)),
+            hovertemplate=(f"<b>%{{customdata}}h · {saison}</b>"
+                           "<br>Consommation : %{r:.0f} kWh<extra></extra>"),
+            customdata=hours, showlegend=False,
         ), row=row, col=col)
 
-        x_paper, y_paper = positions_paper[saison]
+        pos_paper = {"Hiver": (0.22, 0.77), "Printemps": (0.78, 0.77),
+                     "Été": (0.22, 0.23), "Automne": (0.78, 0.23)}
+        xp, yp = pos_paper[saison]
         fig.add_annotation(
-            text=f"moy.<br>{avg:.0f} kWh",
-            x=x_paper,
-            y=y_paper,
-            xref="paper",
-            yref="paper",
-            showarrow=False,
-            font=dict(size=9, color=HQ_BLUE),
-            align="center",
+            text=f"<b>{avg:.0f}</b><br><span style='font-size:9px'>kWh moy</span>",
+            x=xp, y=yp, xref="paper", yref="paper", showarrow=False,
+            font=dict(size=13, color=PALETTE["primary"]), align="center",
         )
 
-    polar_config = dict(
+    polar_cfg = dict(
         radialaxis=dict(
-            visible=True,
-            range=[0, global_max],
-            tickfont=dict(size=12, color=HQ_BLUE, family="Arial Black"),
-            gridcolor="rgba(0,85,127,0.3)",
-            gridwidth=2,
+            visible=True, range=[0, global_max],
+            tickfont=dict(size=10, color=PALETTE["muted"]),
+            gridcolor="rgba(0,85,127,0.18)", nticks=3,
         ),
         angularaxis=dict(
             tickmode="array",
-            tickvals=[h * 360 / 24 for h in range(0, 24, 1)],
+            tickvals=[h * 360 / 24 for h in range(24)],
             ticktext=[f"{h}h" if h % 3 == 0 else "" for h in range(24)],
-            direction="clockwise",
-            rotation=90,
-            gridcolor="rgba(0,85,127,0.3)",
-            tickfont=dict(size=11),
+            direction="clockwise", rotation=90,
+            gridcolor="rgba(0,85,127,0.18)",
+            tickfont=dict(size=10),
         ),
-        bgcolor="#e6f2f8",
+        bgcolor=PALETTE["blue_50"],   # very pale blue background
     )
-
     for i in range(1, 5):
         key = "polar" if i == 1 else f"polar{i}"
-        fig.update_layout(**{key: polar_config})
+        fig.update_layout(**{key: polar_cfg})
 
-    fig.update_layout(
-        title=dict(
-            text="Consommation électrique moyenne par heure selon la saison",
-            font=dict(size=16, color=HQ_BLUE),
-        ),
-        paper_bgcolor="white",
-        font=dict(family="Arial", size=12),
-        margin=dict(t=100, b=40, l=40, r=40),
-        annotations=[a for a in fig.layout.annotations] + [dict(
-            x=0.5, y=1.04, xref="paper", yref="paper",
-            text="Tous postes confondus \u00b7 moyenne 2022\u20132024 \u00b7 kWh/heure",
-            showarrow=False, font=dict(size=11, color="#888780"),
-        )],
-        height=800,
-    )
-
+    subtitle = ("Tous postes confondus" if not poste or poste == "Tous"
+                else f"Poste {poste}") + " · 2022–2024 · pointes en bleu foncé"
+    fig.update_layout(**base_layout(
+        "Consommation moyenne par heure selon la saison",
+        subtitle, height=780,
+    ))
+    fig.update_layout(margin=dict(t=100, b=30, l=40, r=40))
     return fig
