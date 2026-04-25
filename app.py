@@ -101,7 +101,6 @@ sidebar = html.Nav(id="sidebar", children=[
 # ─────────────────────────────────────────────────────────────
 hero = html.Section(id="hero", className="hero-section", children=[
     html.Div(className="hero-content", children=[
-        html.Span("TABLEAU DE BORD ANALYTIQUE", className="hero-kicker"),
         html.H1([
             "Gestion de la demande électrique ",
             html.Br(),
